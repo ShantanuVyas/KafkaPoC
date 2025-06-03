@@ -1,0 +1,136 @@
+package org.example;
+
+import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.TopicPartition;
+
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class DynamicConsumerManager {
+    private final String bootstrapServers;
+    private final String topic;
+    private final String groupId;
+    private final List<ConsumerWorker> workers = new ArrayList<>();
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
+
+    public DynamicConsumerManager(String bootstrapServers, String topic, String groupId) {
+        this.bootstrapServers = bootstrapServers;
+        this.topic = topic;
+        this.groupId = groupId;
+    }
+
+    // Add a new consumer worker and start it in a new thread
+    public synchronized void addConsumer() {
+        ConsumerWorker worker = new ConsumerWorker(bootstrapServers, topic, groupId);
+        workers.add(worker);
+        executorService.submit(worker);
+        System.out.println("Added consumer " + worker.hashCode() + ". Total consumers: " + workers.size());
+    }
+
+    // Remove a consumer worker and stop its thread
+    public synchronized void removeConsumer() {
+        if (workers.isEmpty()) {
+            System.out.println("No consumers to remove.");
+            return;
+        }
+        ConsumerWorker worker = workers.remove(workers.size() - 1);
+        System.out.println("Removing consumer " + worker.hashCode());
+        worker.shutdown();
+        System.out.println("Removed consumer. Total consumers: " + workers.size());
+    }
+
+    // Shutdown all consumers and the executor service
+    public synchronized void shutdown() {
+        for (ConsumerWorker worker : workers) {
+            worker.shutdown();
+        }
+        executorService.shutdown();
+        System.out.println("Manager shutdown.");
+    }
+
+    // Consumer worker class
+    static class ConsumerWorker implements Runnable {
+        private final KafkaConsumer<String, String> consumer;
+        private final String topic;
+        private volatile boolean running = true;
+
+        public ConsumerWorker(String bootstrapServers, String topic, String groupId) {
+            this.topic = topic;
+            Properties props = new Properties();
+            props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+            props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+            props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+            props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+            props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+            this.consumer = new KafkaConsumer<>(props);
+            this.consumer.subscribe(Collections.singletonList(topic));
+        }
+
+        @Override
+        public void run() {
+
+            Set<TopicPartition> currentAssignment = new HashSet<>();
+            try {
+                while (running) {
+                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+
+                    // Print assigned partitions if they have changed
+                    Set<TopicPartition> newAssignment = consumer.assignment();
+                    if (!newAssignment.equals(currentAssignment)) {
+                        currentAssignment = new HashSet<>(newAssignment);
+                        System.out.printf("Consumer %s with Thread %s - Assigned partitions: %s%n",
+                               this.hashCode(),Thread.currentThread().getName(), currentAssignment);
+                    }
+
+                    for (ConsumerRecord<String, String> record : records) {
+                        System.out.printf("Consumer %s with partition %s and Thread %s - Consumed record(key=%s value=%s) at offset %d%n",
+                                this.hashCode(),currentAssignment,Thread.currentThread().getName(), record.key(), record.value(), record.offset());
+                        Thread.sleep(500);
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore if shutting down
+                System.out.println("Exception in DynamicConsumerManager.ConsumerWorker: " + e.getMessage());
+                e.printStackTrace();
+            } finally {
+                consumer.close();
+                System.out.printf("Thread %s - Consumer closed%n", Thread.currentThread().getName());
+            }
+        }
+
+        public void shutdown() {
+            running = false;
+            consumer.wakeup();
+        }
+    }
+
+    // For demo: add/remove consumers interactively
+    public static void main(String[] args) throws Exception {
+        DynamicConsumerManager manager = new DynamicConsumerManager("localhost:9092", "new-topic", "test-group");
+        Scanner scanner = new Scanner(System.in);
+
+        List<String> list = List.of("asdf", "PQR");
+        System.out.println(list);
+        System.out.println("Commands: add, remove, exit");
+        while (true) {
+            System.out.print("> ");
+            String command = scanner.nextLine().trim().toLowerCase();
+            switch (command) {
+                case "add":
+                    manager.addConsumer();
+                    break;
+                case "remove":
+                    manager.removeConsumer();
+                    break;
+                case "exit":
+                    manager.shutdown();
+                    return;
+                default:
+                    System.out.println("Unknown command.");
+            }
+        }
+    }
+}
