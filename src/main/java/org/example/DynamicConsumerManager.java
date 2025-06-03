@@ -5,6 +5,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.TopicPartition;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -86,9 +87,17 @@ public class DynamicConsumerManager {
                     }
 
                     for (ConsumerRecord<String, String> record : records) {
-                        System.out.printf("Consumer %s with partition %s and Thread %s - Consumed record(key=%s value=%s) at offset %d%n",
-                                this.hashCode(),currentAssignment,Thread.currentThread().getName(), record.key(), record.value(), record.offset());
-                        Thread.sleep(500);
+                        String[] parts = record.value().split("\\|");
+                        String val = parts[0];
+                        long sentTs = Long.parseLong(parts[1]);
+                        long now = Instant.now().toEpochMilli();
+                        long elapsed = now - sentTs;
+
+                        System.out.printf(
+                                "Consumer %s with partition %s and Thread %s - Consumed record(key=%s value=%s) sent at %d, now %d, elapsed %d ms at offset %d%n",
+                                this.hashCode(), currentAssignment, Thread.currentThread().getName(), record.key(), val, sentTs, now, elapsed, record.offset()
+                        );
+                        Thread.sleep(500);  //artificial delay to simulate processing time
                     }
                 }
             } catch (Exception e) {
@@ -112,8 +121,6 @@ public class DynamicConsumerManager {
         DynamicConsumerManager manager = new DynamicConsumerManager("localhost:9092", "new-topic", "test-group");
         Scanner scanner = new Scanner(System.in);
 
-        List<String> list = List.of("asdf", "PQR");
-        System.out.println(list);
         System.out.println("Commands: add, remove, exit");
         while (true) {
             System.out.print("> ");

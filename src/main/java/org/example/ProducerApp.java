@@ -16,7 +16,7 @@ public class ProducerApp {
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
             for (int i = 0; i <= 10; i++) {
                 String key = "key-" + i;
-                String value = "Hello Kafka " + i + ":" + Instant.now().toEpochMilli();
+                String value = "Hello Kafka " + i + "|" + Instant.now().toEpochMilli();
                 ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, value);
                 producer.send(record, (metadata, exception) -> {
                     if (exception == null) {
