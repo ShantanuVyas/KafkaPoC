@@ -69,6 +69,8 @@ public class DynamicConsumerManager {
             props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, ConfigLoader.get("consumer.max.poll.records") != null ? ConfigLoader.get("consumer.max.poll.records") : "1");
+
             this.consumer = new KafkaConsumer<>(props);
             this.consumer.subscribe(Collections.singletonList(topic));
 
@@ -104,7 +106,10 @@ public class DynamicConsumerManager {
                                 "Consumer %s with partition %s and Thread %s - Consumed record(key=%s value=%s) sent at %d, now %d, elapsed %d ms at offset %d%n",
                                 this.hashCode(), currentAssignment, Thread.currentThread().getName(), record.key(), val, sentTs, now, elapsed, record.offset()
                         );
-                        Thread.sleep(sleepMs);  //artificial delay to simulate processing time
+
+                        if(sleepMs!=0) {
+                            Thread.sleep(sleepMs);  //artificial delay to simulate processing time
+                        }
                     }
                 }
             } catch (WakeupException we){
@@ -129,6 +134,12 @@ public class DynamicConsumerManager {
     public static void main(String[] args) throws Exception {
         DynamicConsumerManager manager = new DynamicConsumerManager(ConfigLoader.get("bootstrapServers"), ConfigLoader.get("topicName"), ConfigLoader.get("groupId"));
         Scanner scanner = new Scanner(System.in);
+
+        // Read initial consumer count from config
+        int initialConsumers = ConfigLoader.getInt("consumer.initial.count", 1);
+        for (int i = 0; i < initialConsumers; i++) {
+            manager.addConsumer();
+        }
 
         System.out.println("Commands: add, remove, exit");
         while (true) {

@@ -30,7 +30,11 @@ public class ProducerApp {
                         exception.printStackTrace();
                     }
                 });
-                Thread.sleep(sleepMs);
+
+                if(sleepMs!=0) {
+                    System.out.println("Producer sleep executed");  //todo remove this
+                    Thread.sleep(sleepMs);
+                }
             }
             producer.flush();
         } catch (Exception e) {
