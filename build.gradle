@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = 'org.example'
@@ -13,9 +14,20 @@ repositories {
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    implementation 'org.apache.kafka:kafka-clients:3.6.1'
+    implementation 'org.apache.kafka:kafka-clients:4.0.0'
 }
 
 test {
     useJUnitPlatform()
+}
+
+application {
+    // Set to either Producer or Consumer (doesn't matter for the fat jar, you override at runtime)
+    mainClass = 'org.example.DynamicConsumerManager'
+}
+
+shadowJar {
+    manifest {
+        attributes 'Main-Class': 'org.example.DynamicConsumerManager'
+    }
 }
