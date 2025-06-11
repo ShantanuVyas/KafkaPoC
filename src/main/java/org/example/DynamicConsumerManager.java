@@ -4,7 +4,7 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.TopicPartition;
-
+import org.apache.kafka.clients.consumer.AcknowledgeType;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -190,7 +190,7 @@ public class DynamicConsumerManager {
                         if(sleepMs!=0) {
                             Thread.sleep(sleepMs);  //artificial delay to simulate processing time
                         }
-                        sharedConsumer.acknowledge(record);
+                        sharedConsumer.acknowledge(record, AcknowledgeType.ACCEPT);
                     }
 
                     sharedConsumer.commitSync();
