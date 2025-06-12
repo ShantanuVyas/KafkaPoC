@@ -174,6 +174,9 @@ public class DynamicConsumerManager {
             try {
                 while (running) {
                     ConsumerRecords<String, String> records = sharedConsumer.poll(Duration.ofMillis(pollMs));
+                    /*if(!records.isEmpty()){
+                        System.out.printf("Consumer %s and Number of records polled %s%n",this.hashCode(),records.count());
+                    }*/
 
                     for (ConsumerRecord<String, String> record : records) {
                         String[] parts = record.value().split("\\|");
@@ -191,9 +194,8 @@ public class DynamicConsumerManager {
                             Thread.sleep(sleepMs);  //artificial delay to simulate processing time
                         }
                         sharedConsumer.acknowledge(record, AcknowledgeType.ACCEPT);
+                        sharedConsumer.commitSync();//Can be made async
                     }
-
-                    sharedConsumer.commitSync();
                 }
             } catch (WakeupException we){
                 //ignore
